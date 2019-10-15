@@ -1,0 +1,252 @@
+---
+  title: Java虚拟机的类加载机制
+  date: {{ date }}
+  categories: ['后端']
+  tags: ['activiti','工作流']
+  comments: true
+  img:
+---
+
+本文的内容主要是基于activiti（5.22）与springBoot集成在线的流程设计器。以及对activiti工作流程的一个初探。
+
+[springBoot整合activiti流程设计器demo](https://github.com/JanHezz/springboot_activity)
+先下载demo在来看这篇文章。
+
+如果您需要学习整合activiti建议您下载我的源码我的源码是已经整合好的而且排了坑。我的文章内容不会教你一步步整合，我会讲一些我遇到的一些坑以及解决办法。下载我的源码是可以直接运行的然后访问
+http://localhost:8080/act/model/add就可以看到流程设计页面。
+建议自己先走一遍在来看文章效果更佳。
+
+## activiti概述
+activiti是工作流引擎。是由**Alfresco**软件开源的一个项目。它是覆盖了业务流程管理、工作流、服务协作等领域的一个开源的、灵活的、易扩展的可执行流程语言框架。
+开发人员可以通过插件直接绘画出业务流程图。ProcessEngine：ProcessEngine对象是activiti的工作流引擎。负责生成流程运行时的各种实例及数据、监控和管理流程的运行。
+BPMN：业务流程建模与标注（Business Process Model and Notation，BPMN)，描述流程的基本符号，包括这些图元如何组合成一个业务流程图。
+
+## 这篇文章主要能学到什么
+- 会使用springboot整合一个在线的流程设计器
+- activiti的使用流程
+- 对activiti内置的表结构有一个的理解
+
+接下来我们做一些简单的准备
+
+需要一个在线的流程设计器的war包。官网可以下。[activiti官网](https://www.activiti.org/)
+
+mysql数据库。官网下[mysql官网](https://www.mysql.com/)
+
+我的整个项目源码[springBoot整合activiti流程设计器demo](https://github.com/JanHezz/springboot_activity)
+
+下载了我的项目源码只需要准备一个mysql数据库就行了。
+
+
+
+## 整合过程我遇到的坑
+
+- 包冲突问题
+在这次的整合过程中我一开始使用的是springboot默认的starter。发现activiti内置了mybatis包。所以我们需要把activiti内置的mybatis包排除掉
+```
+<dependency>
+           <groupId>org.activiti</groupId>
+           <artifactId>activiti-spring-boot-starter-basic</artifactId>
+           <version>${activiti.version}</version>
+           <exclusions>
+               <exclusion>
+                   <groupId>org.mybatis</groupId>
+                   <artifactId>mybatis</artifactId>
+               </exclusion>
+          </exclusions>
+</dependency>
+```
+- activiti自带了spring-security每次访问项目会默认让你登录
+这个bug困扰了很久。正是这个bug我放弃了springboot2.0集成的activiti我选择了自己整合。也就是放弃依赖activiti-spring-boot-starter-basic这个包。
+```
+<dependency>
+            <groupId>org.activiti</groupId>
+            <artifactId>activiti-engine</artifactId>
+            <version>${activiti.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.mybatis</groupId>
+                    <artifactId>mybatis</artifactId>
+                </exclusion>
+
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.activiti</groupId>
+            <artifactId>activiti-spring</artifactId>
+            <version>${activiti.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.activiti</groupId>
+            <artifactId>activiti-modeler</artifactId>
+            <version>${activiti.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.activiti</groupId>
+            <artifactId>activiti-diagram-rest</artifactId>
+            <version>${activiti.version}</version>
+        </dependency>
+
+```
+可以看到这里同样需要去除了mybatis的包。同时我们在启动类上需要排除掉org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class这个自动整合类。
+```
+@EnableAutoConfiguration(exclude = {
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class
+})
+```
+
+## 核心表结构结构
+（Business Process Diagram）数据库:Activiti的后台是有数据库的支持，所有的表都以ACT_开头。 第二部分是表示表的用途的两个字母标识。 用途也和服务的API对应。
+
+- ACT_RE_: 'RE’表示repository。 这个前缀的表包含了流程定义和流程静态资源 （图片，规则，等等）。
+- ACT_RU_: 'RU’表示runtime。 这些运行时的表，包含流程实例，任务，变量，异步任务，等运行中的数据。 Activiti只在流程实例执行过程中保存这些数据， 在流程结束时就会删除这些记录。 这样运行时表可以一直很小速度很快。
+-  ACT_ID_: 'ID’表示identity。 这些表包含身份信息，比如用户，组等等。
+- ACT_HI_: 'HI’表示history。 这些表包含历史数据，比如历史流程实例， 变量，任务等等。
+- ACT_GE_*: 通用数据， 用于不同场景下，如存放资源文件。 资源库流程规则表:  
+-   act_re_deployment　　 部署信息表
+-   act_re_model 　　流程设计模型部署表
+-  act_re_procdef 　　流程定义数据表运行时数据库表:
+-   act_ru_execution 　　运行时流程执行实例表
+-    act_ru_identitylink 　　运行时流程人员表，主要存储任务节点与参与者的相关信息
+-  act_ru_task 　　运行时任务节点表
+-   act_ru_variable 　　运行时流程变量数据表历史数据库表：
+-   act_hi_actinst 　　历史节点表
+-   act_hi_attachment 　　历史附件表
+-  act_hi_comment 　　历史意见表
+-   act_hi_identitylink 　　历史流程人员表
+-   act_hi_detail 　　历史详情表，提供历史变量的查询
+-   act_hi_procinst 　　历史流程实例表
+-   act_hi_taskinst　　 历史任务实例表
+-   act_hi_varinst 　　历史变量表组织机构表：
+-  act_id_group 　　用户组信息表
+-   act_id_info 　　用户扩展信息表
+-   act_id_membership 　　用户与用户组对应信息表
+-   act_id_user　　 用户信息表
+ 这四张表很常见，基本的组织机构管理，关于用户认证方面建议还是自己开发一套，组件自带的功能太简单，使用中有很多需求难以满足
+ 通用数据表：
+-   act_ge_bytearray 　　二进制数据表(流程图设计好了会以流的形式存到这张表里)
+-  act_ge_property 　　属性数据表存储整个流程引擎级别的数据,初始化表结构时，会默认插入三条记录。
+
+## 工作流使用流程
+坑踩完了开始使用了。在这里大家首先会去认识到哪个步骤需要用哪个业务类去操作。并且这个类的一些操作对应的表会有哪些变化。
+
+1. 创建并设计模型
+打开页面上的流程设计器进行设计。设计好保存会去调用控制层的保存方法。
+
+这里代码没贴全创建跟保存我是分开的。这个创建出来的是空的，当流程设计完毕后会调用保存方法，我的源码中saveModel这个方法就是保存的。
+
+在这个步骤要做很多事，也是核心。工作流的走向，审批人是谁等等。在这一步就要指定好。
+
+repositoryService这个类主要是用来操作跟模型相关的。
+
+```
+try {
+Model model = repositoryService.newModel();
+//设置一些默认信息
+String name = "new-process";
+String description = "";
+int revision = 1;
+String key = "process";
+
+ObjectNode modelNode = objectMapper.createObjectNode();
+modelNode.put(ModelDataJsonConstants.MODEL_NAME, name);
+modelNode.put(ModelDataJsonConstants.MODEL_DESCRIPTION, description);
+modelNode.put(ModelDataJsonConstants.MODEL_REVISION, revision);
+
+model.setName(name);
+model.setKey(key);
+model.setMetaInfo(modelNode.toString());
+
+repositoryService.saveModel(model);
+```
+>创建后act_re_model会多了一条记录
+
+值得一提的是如果工作流对应的其实是一个xml文件，也就是设计出来的最终的效果是一个xml文件。所以部署流程也就是部署这个文件。同个文件可以部署多次。对应的是更新版本。
+在我给大家提供的项目中会有下载流程xml文件的接口。exportToXml也就是这个方法把模型id传过去就可以看到了。
+2. 部署模型
+部署我们根据模型的唯一id去部署
+
+部署也是操作模型所以这里还是使用repositoryService这个类
+
+```
+        //获取模型
+        Model modelData = repositoryService.getModel(id);
+        byte[] bytes = repositoryService.getModelEditorSource(modelData.getId());
+
+        if (bytes == null) {
+            return "fail";
+        }
+        JsonNode modelNode = null;
+        try {
+            modelNode = new ObjectMapper().readTree(bytes);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return "fail";
+        }
+        BpmnModel model = new BpmnJsonConverter().convertToBpmnModel(modelNode);
+        if (model.getProcesses().size() == 0) {
+            return "fail";
+        }
+        byte[] bpmnBytes = new BpmnXMLConverter().convertToXML(model);
+
+        //发布流程
+        String processName = modelData.getName() + ".bpmn20.xml";
+        Deployment deployment = null;
+        try {
+            deployment = repositoryService.createDeployment()
+                    .name(modelData.getName())
+                    .addString(processName, new String(bpmnBytes, "UTF-8"))
+                    .deploy();
+        } catch (UnsupportedEncodingException e) {
+
+            e.printStackTrace();
+            return  "fail";
+        }
+        modelData.setDeploymentId(deployment.getId());
+        repositoryService.saveModel(modelData);
+
+        return "success";
+```
+>部署后act_re_procdef，act_re_deployment会新增一条数据
+>act_ge_bytearray（新增两条一个流程文件一个流程图）
+3. 启动流程
+启动流程的时候。这时大家就可以关联自己的业务表了比如请假表等等。在新增请假条的时来启动一个流程。并把businessId关联进去。
+
+runtimeService在运行时操作任务就需要用到这个类。
+identityService看名字也知道操作用户或者角色的信息的业务类。
+
+```
+//设置发起者
+identityService.setAuthenticatedUserId(id);
+// 启动流程 key:要启动的模型的key   businessId:业务的id
+ProcessInstance procIns = runtimeService.startProcessInstanceByKey("key","businessId");
+```
+>启动后act_ru_task会新增一条记录act_hi_actinst会新增两条一个提交一个待审批的记录act_hi_taskinst会新增一条act_hi_procinst会新增一条。act_hi_identitylink会跟据模型生成对应的人员关系
+
+4. 审批流程
+taskService就是用来对流程任务进行管理，例如任务提醒、任务完成和创建任务等。
+
+审批对应的操作在工作流中会使用到taskService这个类。
+在这一步有别的业务就需要调用别的业务类了。
+
+```
+//pass 这个参数 1代表审批通过 0代表审批拒绝 这个使用了排他网关是在流程图定义时做好的。
+Map<String,Object> vars = new HashMap<>(16);
+		vars.put("pass",  1 );
+taskService.complete("37505",vars);
+```
+
+>启动act_ru_task会新增一条记录(把原先那个id给删了)act_hi_actinst会新增一条一个待审批的记录act_hi_taskinst会新增一条act_hi_procinst会新增一条。（如果审批完了act_ru_task就没有记录了）
+
+上文中用到了几个核心的service  activiti还内置了其他几个service
+
+HistoryService是activiti的查询历史信息的类。
+> 在一个流程执行完成后，这个对象为我们提供查询历史信息。
+
+FormService  一个可选服务，任务表单管理
+> 这个service我目前没有使用到他的功能。等我使用到了我再来补充。
+这里有篇博客详解这个service是干嘛的
+[activiti的FormService的使用](https://blog.csdn.net/bigtree_3721/article/details/82891391)
+
+## 总结
+activiti的初探功能，相信看了这篇文章写一个请假流程的demo大家应该是没问题的。我接下来会一直更新这篇文章。跟大家一同探索工作流
