@@ -1,11 +1,5 @@
----
-  title:  Docker中安装nginx
-  date: {{ date }}   
-  categories: ['lunix'] 
-  tags: ['lunix','centsos7','docker','nginx']       
-  comments: true    
-  img:             
----
+《 MySQL存储引擎－－MyISAM与InnoDB区别》首发[橙寂博客](http://www.luckyhe.com/post/65.html)转发请加此提示
+
 # MySQL存储引擎－－MyISAM与InnoDB区别
 
 `MyISAM `和`InnoDB` 讲解　　
@@ -35,9 +29,9 @@
 
 **两种类型最主要的差别就是`InnoDB` 支持事务处理与外键和行级锁。**而`MyISAM`不支持.所以`MyISAM`往往就容易被人认为只适合在小项目中使用。
 
-　　作为使用MySQL的用户角度出发，`InnoDB`和`MyISAM`都是比较喜欢的，如果数据库平台要达到需求：99.9%的稳定性，方便的扩展性和高可用性来说的话，`MyISAM`绝对是首选。　
+　　作为使用MySQL的用户角度出发，`InnoDB`和`MyISAM`都是比较喜欢的，如果数据库平台要达到需求：99.9%的稳定性，方便的扩展性和高可用性来说的话，`MyISAM`绝对是首选。
 
-　原因如下：　
+　原因如下：（引用知秋大佬的原文）
 
 　1、平台上承载的大部分项目是读多写少的项目，而`MyISAM`的读性能是比`InnoDB`强不少的。　
 
@@ -48,6 +42,10 @@
   4、从接触的应用逻辑来说，`select count(*)`和`order by` 是最频繁的，大概能占了整个sql总语句的60%以上的操作，而这种操作`Innodb`其实也是会锁表的，很多人以为`Innodb`是行级锁，那个只是`where`对它主键是有效，非主键的都会锁全表的。　
 
 　5、还有就是经常有很多应用部门需要我给他们定期某些表的数据，`MyISAM`的话很方便，只要发给他们对应那表的`frm.MYD,MYI`的文件，让他们自己在对应版本的数据库启动就行，而`Innodb`就需要导出`xxx.sql`了，因为光给别人文件，受字典数据文件的影响，对方是无法使用的。　
+
 　6、如果和``MyISAM``比`insert`写操作的话，`Innodb`还达不到`MyISAM`的写性能，如果是针对基于索引的`update`操作，虽然`MyISAM`可能会逊色`Innodb`,但是那么高并发的写，从库能否追的上也是一个问题，还不如通过多实例分库分表架构来解决。　
+
 　7、如果是用`MyISAM`的话，`merge`引擎可以大大加快应用部门的开发速度，他们只要对这个`merge`表做一些`select count(*)`操作，非常适合大项目总量约几亿的`rows`某一类型(如日志，调查统计)的业务表。　
+
 　　当然`Innodb`也不是绝对不用，用事务的项目就用`Innodb`的。另外，可能有人会说你MyISAM无法抗太多写操作，但是可以通过架构来弥补。
+
