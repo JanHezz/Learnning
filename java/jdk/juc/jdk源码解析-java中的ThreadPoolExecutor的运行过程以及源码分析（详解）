@@ -1,0 +1,274 @@
+《jdk源码解析-java中的ThreadPoolExecutor概述以及使用》首发[橙寂博客](http://www.luckyhe.com/post/78.html)转发请加此提示
+
+## jdk源码解析-java中的ThreadPoolExecutor概述以及使用
+
+关于ThreadPoolExecutor这个类，应该很多人都使用过。在我的认知中它就是一个线程池工具类。
+
+首先我们看下官方文档(愿意看就看下，不愿意直接看我的中文解释)这篇文档就是我这篇文章要讲的内容
+
+```
+/**
+ * An {@link ExecutorService} that executes each submitted task using
+ * one of possibly several pooled threads, normally configured
+ * using {@link Executors} factory methods.
+ *
+ * <p>Thread pools address two different problems: they usually
+ * provide improved performance when executing large numbers of
+ * asynchronous tasks, due to reduced per-task invocation overhead,
+ * and they provide a means of bounding and managing the resources,
+ * including threads, consumed when executing a collection of tasks.
+ * Each {@code ThreadPoolExecutor} also maintains some basic
+ * statistics, such as the number of completed tasks.
+ *
+ * <p>To be useful across a wide range of contexts, this class
+ * provides many adjustable parameters and extensibility
+ * hooks. However, programmers are urged to use the more convenient
+ * {@link Executors} factory methods {@link
+ * Executors#newCachedThreadPool} (unbounded thread pool, with
+ * automatic thread reclamation), {@link Executors#newFixedThreadPool}
+ * (fixed size thread pool) and {@link
+ * Executors#newSingleThreadExecutor} (single background thread), that
+ * preconfigure settings for the most common usage
+ * scenarios. Otherwise, use the following guide when manually
+ * configuring and tuning this class:
+ */
+
+```
+
+以上一堆东西大致讲了的是
+
+ExecutorService（ThreadPoolExecutor的顶层接口）使用线程池中的线程执行每个提交的任务，通常我们使用Executors的工厂方法来创建ExecutorService。
+线程池解决了两个不同的问题：
+
+提升性能：它们通常在执行大量异步任务时，由于减少了每个任务的调用开销，并且它们提供了一种限制和管理资源（包括线程）的方法，使得性能提升明显；
+统计信息：每个ThreadPoolExecutor保持一些基本的统计信息，例如完成的任务数量。
+为了在广泛的上下文中有用，此类提供了许多可调参数和可扩展性钩子。 但是，在常见场景中，我们预配置了几种线程池，我们敦促程序员使用更方便的Executors的工厂方法直接使用。
+
+```java
+
+Executors.newCachedThreadPool（无界线程池，自动线程回收）
+Executors.newFixedThreadPool（固定大小的线程池）；
+Executors.newSingleThreadExecutor（单一后台线程）；
+
+```
+
+除了使用以上默认的三种方式，我们还可以用下面的方式创建。
+
+- **1.创建ThreadPoolExecutor**
+
+ ```java
+
+  public ThreadPoolExecutor(int corePoolSize,
+                            int maximumPoolSize,
+                            long keepAliveTime,
+                            TimeUnit unit,
+                            BlockingQueue<Runnable> workQueue) {
+      this(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue,
+           Executors.defaultThreadFactory(), defaultHandler);
+  }
+
+  public ThreadPoolExecutor(int corePoolSize,
+                            int maximumPoolSize,
+                            long keepAliveTime,
+                            TimeUnit unit,
+                            BlockingQueue<Runnable> workQueue,
+                            ThreadFactory threadFactory) {
+      this(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue,
+           threadFactory, defaultHandler);
+  }
+
+  public ThreadPoolExecutor(int corePoolSize,
+                            int maximumPoolSize,
+                            long keepAliveTime,
+                            TimeUnit unit,
+                            BlockingQueue<Runnable> workQueue,
+                            RejectedExecutionHandler handler) {
+      this(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue,
+           Executors.defaultThreadFactory(), handler);
+  }
+
+  public ThreadPoolExecutor(int corePoolSize,
+                            int maximumPoolSize,
+                            long keepAliveTime,
+                            TimeUnit unit,
+                            BlockingQueue<Runnable> workQueue,
+                            ThreadFactory threadFactory,
+                            RejectedExecutionHandler handler) {
+      if (corePoolSize < 0 ||
+          maximumPoolSize <= 0 ||
+          maximumPoolSize < corePoolSize ||
+          keepAliveTime < 0)
+          throw new IllegalArgumentException();
+      if (workQueue == null || threadFactory == null || handler == null)
+          throw new NullPointerException();
+      this.acc = System.getSecurityManager() == null ?
+              null :
+              AccessController.getContext();
+      this.corePoolSize = corePoolSize;
+      this.maximumPoolSize = maximumPoolSize;
+      this.workQueue = workQueue;
+      this.keepAliveTime = unit.toNanos(keepAliveTime);
+      this.threadFactory = threadFactory;
+      this.handler = handler;
+  }
+ ```
+
+- 创建参数讲解
+ | 参数        | 类型   |  说明  |
+ | --------   | -----:  | :----:  |
+ | corePoolSize     | int |   核心线程的数据  |
+ | maximumPoolSize     | int |   最大线程的数量  |
+ | keepAliveTime     | long |   线程最大空闲时间  |
+ | unit     | TimeUnit |   时间的单位比如秒 TimeUnit.SECONDS |
+ | workQueue | BlockingQueue<Runnable> |   等待队列（这个有好几种策略）  |
+ | threadFactory  | ThreadFactory|  创建线程的工厂  |
+ | handler     |  RejectedExecutionHandler |   线程被拒后的的处理类  |
+
+
+- corePoolSize与maximumPoolSize
+corePoolSize是核心线程数，maximumPoolSize是创建最大的线程数.
+当有新的任务进来时如果corePoolSize未满那么就会创建新的线程。如果corePoolSize满了那么进入
+等待队列，当等待队列满了那么如果maximumPoolSize未满，就会创建一个新的线程。如果都被占用了那么直接走被拒。
+下面看一下图比较直观。
+
+![任务处理流程](../../../pic/java/jdk/juc/运行流程.png)
+
+- keepAliveTime 与unit
+
+这个是线程的空闲时间,超过这个时间线程便会销毁。unit是时间的单位
+
+- workQueue
+
+线程等待队列。这个队列有三种策略。
+
+Direct handoffs 直接握手队列
+
+Direct handoffs 的一个很好的默认选择是 SynchronousQueue，它将任务交给线程而不需要保留。这里，如果没有线程立即可用来运行它，那么排队任务的尝试将失败，因此将构建新的线程。
+此策略在处理可能具有内部依赖关系的请求集时避免锁定。Direct handoffs 通常需要无限制的maximumPoolSizes来避免拒绝新提交的任务。 但得注意，当任务持续以平均提交速度大余平均处理速度时，会导致线程数量会无限增长问题。
+
+Unbounded queues 无界队列
+
+当所有corePoolSize线程繁忙时，使用无界队列（例如，没有预定义容量的LinkedBlockingQueue）将导致新任务在队列中等待，从而导致maximumPoolSize的值没有任何作用。当每个任务互不影响，完全独立于其他任务时，这可能是合适的; 例如，在网页服务器中， 这种队列方式可以用于平滑瞬时大量请求。但得注意，当任务持续以平均提交速度大余平均处理速度时，会导致队列无限增长问题。
+
+Bounded queues 有界队列
+
+一个有界的队列（例如，一个ArrayBlockingQueue）和有限的maximumPoolSizes配置有助于防止资源耗尽，但是难以控制。队列大小和maximumPoolSizes需要 相互权衡：
+
+使用大队列和较小的maximumPoolSizes可以最大限度地减少CPU使用率，操作系统资源和上下文切换开销，但会导致人为的低吞吐量。如果任务经常被阻塞（比如I/O限制），那么系统可以调度比我们允许的更多的线程。
+使用小队列通常需要较大的maximumPoolSizes，这会使CPU更繁忙，但可能会遇到不可接受的调度开销，这也会降低吞吐量。
+
+- threadFactory
+
+新线程使用ThreadFactory创建。 如果未另行指定，则使用Executors.defaultThreadFactory默认工厂，使其全部位于同一个ThreadGroup中，并且具有相同的NORM_PRIORITY优先级和非守护进程状态。
+
+通过提供不同的ThreadFactory，您可以更改线程的名称，线程组，优先级，守护进程状态等。如果ThreadCactory在通过从newThread返回null询问时未能创建线程，则执行程序将继续，但可能无法执行任何任务。
+
+
+- handler
+
+拒绝任务有两种情况：1. 线程池已经被关闭；2. 任务队列已满且maximumPoolSizes已满；
+无论哪种情况，都会调用RejectedExecutionHandler的rejectedExecution方法。预定义了四种处理策略：
+
+AbortPolicy：默认测策略，抛出RejectedExecutionException运行时异常；
+
+CallerRunsPolicy：这提供了一个简单的反馈控制机制，可以减慢提交新任务的速度；
+
+DiscardPolicy：直接丢弃新提交的任务；
+
+DiscardOldestPolicy：如果执行器没有关闭，队列头的任务将会被丢弃，然后执行器重新尝试执行任务（如果失败，则重复这一过程）；
+我们可以自己定义RejectedExecutionHandler，以适应特殊的容量和队列策略场景中。
+
+## ThreadPoolExecutor的使用方法
+
+```java
+
+public class PoolTest {
+
+        public static void main(String[] args) throws InterruptedException, IOException {
+            int corePoolSize = 1;
+            int maximumPoolSize = 4;
+            long keepAliveTime = 10;
+            TimeUnit unit = TimeUnit.SECONDS;
+            //阻塞队列
+            BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(2);
+            //自定义线程工厂
+            ThreadFactory threadFactory = new NameTreadFactory();
+            //自定义线程被拒处理器
+            RejectedExecutionHandler handler = new MyIgnorePolicy();
+            //创建一个ThreadPoolExecutor
+            ThreadPoolExecutor executor = new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit,
+                    workQueue, threadFactory, handler);
+
+            // 预启动所有核心线程
+            executor.prestartAllCoreThreads();
+
+            for (int i = 1; i <= 20; i++) {
+                MyTask task = new MyTask(String.valueOf(i));
+                //开启一个新的任务
+                executor.execute(task);
+            }
+
+            System.in.read(); //阻塞主线程
+        }
+
+        static class NameTreadFactory implements ThreadFactory {
+
+            private final AtomicInteger mThreadNum = new AtomicInteger(1);
+
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "my-thread-" + mThreadNum.getAndIncrement());
+                System.out.println(t.getName() + " has been created");
+                return t;
+            }
+        }
+
+        public static class MyIgnorePolicy implements RejectedExecutionHandler {
+
+            public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+                doLog(r, e);
+            }
+
+            private void doLog(Runnable r, ThreadPoolExecutor e) {
+                // 可做日志记录等
+                System.err.println( r.toString() + " rejected");
+//          System.out.println("completedTaskCount: " + e.getCompletedTaskCount());
+            }
+        }
+
+        static class MyTask implements Runnable {
+            private String name;
+
+            public MyTask(String name) {
+                this.name = name;
+            }
+
+            @Override
+            public void run() {
+                try {
+                    System.out.println(this.toString() + " is running!");
+                    Thread.sleep(3000); //让任务执行慢点
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            public String getName() {
+                return name;
+            }
+
+            @Override
+            public String toString() {
+                return "MyTask [name=" + name + "]";
+            }
+        }
+
+}
+
+```
+
+## 总结
+
+本篇文章要对于`ThreadPoolExecutor`的大致概念，以及使用。这个类相当于线程池的执行者,对于我们来说定义好一个`ThreadPoolExecutor`然后创建自己的任务，然后调用`execute(task)`方法就可以了。下一篇文章我会对`ThreadPoolExecutor`的运行过程以及源码进行一个解析。
+
+- [`ThreadPoolExecutor`的运行过程以及源码分析](http://www.luckyhe.com/post/79.html)
