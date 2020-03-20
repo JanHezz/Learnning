@@ -1,4 +1,4 @@
-《Spring源码解析-入门Spring的IOC思想》首发[橙寂博客](http://www.luckyhe.com/post/80.html)转发请加此提示
+《Spring源码解析-入门Spring的IOC思想》首发[橙寂博客](http://www.luckyhe.com/post/79.html)转发请加此提示
 
 ## Spring源码解析-入门Spring的IOC思想
 
@@ -12,7 +12,7 @@
 
 `Spring Core`是`Spring`的核心。而`Spring`的核心讲的就是一个`IOC`思想。`Spring`的`IOC`容器管理着是一个或者多个`Bean`。在一个`Spring`应用启动,`Spring`会根据我们提供的元数据。
 做一个`自省`的过程。当我们真正用一些`Bean`时。这时我们可以通过注解（@Autowired）的方式或者是主动调用`ApplicationContext`的`getBean()`方法根据标识符（Id或者带包名的类名）从容器中取得我们想要的
-`Bean`对象。这就是`IOC`也叫做`DI`。
+`Bean`对象。这里引用小马哥的一句话:"IOC是思想，而DI则是实现"。
 
 当然在容器中每个`Bean`都是有个唯一的`Id`的，如果我们不显示的提供,`Spring`会根据Java的规范默认按照驼峰命名法命名（首字母小写）。(例如:postService,postDao)
 
@@ -89,10 +89,10 @@ dao.xml
 //这里可以加载多个文件,分隔。
 ApplicationContext context = new ClassPathXmlApplicationContext("daos.xml");
 
-// retrieve configured instance
+// 通过Id获得容器中的对象
 JpaAccountDao dao = context.getBean("accountDao");
 
-// use configured instance
+// 使用对象中的方法
 List<String> userList = dao.getUsernameList();
 
 ```
@@ -209,11 +209,12 @@ public class ExampleBean {
 
 - 注解方式注入
 
-这种方式应该是目前用的最多的一种形式。特别是在`SpringBoot`项目中,抛弃`xml`配置的方式,全局使用了注解的方式。
-（题外话:SpringBoot中的自动装配机制其实跟`Spring`的机制是相通的。Springboot内置了一些自动装配的配置类。所以只需要改改配置文件。就能自动注入我们需要类）
+
+这种方式应该是目前用的最多的一种形式。特别是在`springBoot`项目中,抛弃`xml`配置的方式,全局使用了注解的方式。
+（题外话:SpringBoot中的自动装配机制其实跟`Spring`的机制是相通的。Springboot内置了一些自动装配的配置类。所以只需要改改配置文件。就能自动注入我们需要类。所以springBoot应用能很快的整合别的框架）
 
 当你想要在你的`Bean`中使用`@Autoried`  `@Resource(name = "bean的名字")`注入您需要的`Bean`。
-你一定要确定`Bean`一定要存在于容器中。（也就是说一定要先提供的元数据）。
+你一定要确定`Bean`存在于容器中。（也就是说一定要先提供的元数据）。
 
 下面讲几个在日常开发中经常会用到的例子
 
@@ -226,379 +227,102 @@ public class BaseController
 	@Autowired
 	public SysUserService sysUserService;
 
-
-  //这个name一定是你配置的名字，如果你没配那么默认是首字母小写
-  @Resource(name = "sysPermissionService")
-  public SysPermissionService sysPermissionService;
+   //这个name一定是你配置的名字，如果你没配那么默认是首字母小写
+   @Resource(name = "sysPermissionService")
+   public SysPermissionService sysPermissionService;
   }
 
-
 ```
 
+上面两个例子是在开发经常使用的。
 
 
-```java
-Lock lock = new ReentrantLock
-lock.lock();
-try{
-}finally{
- lock.unlock();
-}
-```
+## 补充
 
-Lock接口提供了Synchronized关键字不具备的特性
+- `自动装配机制`
+`spring`在注册`Bean`的时候就会自动处理`Bean`之间的依赖关系。当然其中就涉及到了一个循环依赖的问题。
+上面讲了怎么往`Bean`对象中注入属性以及`对象`。并且演示了怎么往`Bean`中注入另一个`Bean`。那么`SpringIOC`容器是怎么做到两个`Bean`之间互相协作的呢？这完全取决于`IOC`的自动装配机制。自动装配可以通过`name`,'type','构造函数'等模式来实现这个功能。
+默认是通过`Type`来实现的。也是说比如你想要个`String`类型的对象它就会给你注入一个`String`类型的。
 
-| 尝试非阻塞地获取锁 | 当前线程尝试获取锁，没有其他线程获取锁，则成功 |
-| --------- | ----------------------- |
-| 能被中断的获取锁  |                         |
-| 超时获取锁     | 在指定的时间内获取锁              |
+- `Bean`的作用域
 
-Lock接口的API
+每个`Bean`在容器中是有自己的作用域的。一共存在`singleton`(单例),`prototype`(原型),`request`，`session`,`application`,`websocket`。
+在spring中创建的`bean`默认是`singleton`的。
+这里主要讲一下'singleton'和'prototype'。我在面试中被问到过这两者的区别,我是这么回答的:singleton是无状态的,prototype是有状态的。然后我举了个例子,比如有个`orderService`购物车服务,一个客户是不是有一个购物车,而且购物车是不能被共享的。也就是每个人都要创建一个购物车。这就是`prototype`原型模式。每次获取`Bean`都会有一个全新的`Bean`。所以说`prototype`有状态.
+而`singleton`容器中只有一个实例。使用`singleton`定义的实例在同一个线程中A对象跟B对象都依赖的是同一个实例。
+有想要了解其他的参考[spring官方文档Bean的作用域](https://docs.spring.io/spring/docs/5.2.2.RELEASE/spring-framework-reference/core.html#beans-factory-scopes)
 
-| api                          |                                          |
-| ---------------------------------------- | ---------------------------------------- |
-| void lock()                    | lock 优先考虑获取锁，待获取锁成功后，才响应中断。|
-| void lockInterruptibly() throws InterruptedException |  lockInterruptibly 优先考虑响应中断，而不是响应锁的普通获取或重入获取。
-                                        |
-| boolean tryLock()                        |     同Lock                                    |
-| boolean tryLock(long time,TimeUtil unit) throws InterruptedException |    在一定时间time内尝试获取锁                                     |
-| void unlock()                            |       释放锁                                   |
-| Condition newCondition                   | 获取等待通知组件，该组件和当前的锁绑定，当前线程只有获取了锁，才能调用该组件的wait（）方法，而调用后，当前线程将会释放锁 |
+- 容器的扩展
 
-
-#### 队列同步器AbstractQueuedSynchronized
-
-上面介绍的是ReentrantLock中的api,最主要的事是`AbstractQueuedSynchronized`在做。
-
-锁的实现基于队列同步器完成，AbstractQueuedSynchronized（简称同步器），使用一个int成员变量state表示同步状态，通过内置的FIFO队列来完成资源获取线程的排队工作
-队列同步器分两种一种是`NonfairSync`非公平锁默认是用非公平方式,另一种是`FairSync`公平锁。
-
-
-#### NonfairSync实现
-
-所谓非公平，讲的是获取锁的方式不公平。排队买票，按理说先来先买，但是在这里每个新来的人都能跟你抢票。下面看源码的实现。
-下面代码为我调用Lock方法时执行的一个顺序。其中有些方法不属于`NonfairSync`
+`IOC`内置了一些接口。方便我们在`SpringIOC`外部操作`Bean`对容器进行扩展。比如`ApplicationContextAware`接口。`BeanPostProcessor`接口,`BeanFactoryPostProcessor`接口都内置了回调方法。
+这里给大家讲一个实用的工具类就是,获取`ApplicationContext`这个容器对象这样我们就能操作`getBean方法`。
+下面我们会通过继承`ApplicationContextAware `来实现。
 
 ```java
+public class SpringContextHolder implements ApplicationContextAware, DisposableBean {
 
-   /**
-    * Sync object for non-fair locks
-    */
-   static final class NonfairSync extends Sync {
-       private static final long serialVersionUID = 7316153563782823691L;
-
-       /**
-        * Performs lock.  Try immediate barge, backing up to normal
-        * acquire on failure.
-        */
-       final void lock() {
-            //尝试着获取锁 这里也是不公平的体现，刚进来就有机会获取锁
-           if (compareAndSetState(0, 1))
-               setExclusiveOwnerThread(Thread.currentThread());
-           else
-
-               acquire(1);
-       }
+    private static ApplicationContext applicationContext = null;
 
 
-       /**
-        *
-        * 调用这个方法首先会尝试获取锁，如果获取不到会把当前线程加入等待列中
-        */
-       public final void acquire(int var1) {
-           //this.acquireQueued(this.addWaiter(AbstractQueuedSynchronizer.Node.EXCLUSIVE), var1)
-           //这个方法把当前线程加入等待序列。具体代码自己去看。
-            if (!this.tryAcquire(var1) && this.acquireQueued(this.addWaiter(AbstractQueuedSynchronizer.Node.EXCLUSIVE), var1)) {
-                selfInterrupt();
-            }
-
-
-       protected final boolean tryAcquire(int acquires) {
-           return nonfairTryAcquire(acquires);
-       }
-
-
-       /**
-        * Performs non-fair tryLock.  tryAcquire is implemented in
-        * subclasses, but both need nonfair try for trylock method.
-        *尝试获取锁
-        */
-       final boolean nonfairTryAcquire(int acquires) {
-
-           //获取当前
-           final Thread current = Thread.currentThread();
-           //当前锁的占用量
-           int c = getState();
-           if (c == 0) {
-           //如果没有人用这个锁尝试获取锁
-               if (compareAndSetState(0, acquires)) {
-                   setExclusiveOwnerThread(current);
-                   return true;
-               }
-           }
-           else if (current == getExclusiveOwnerThread()) {
-               int nextc = c + acquires;
-               if (nextc < 0) // overflow
-                   throw new Error("Maximum lock count exceeded");
-               setState(nextc);
-               return true;
-           }
-           return false;
-       }
-
-   }
-```
-
-#### FairSync实现
-
-所谓非公平，讲的是获取锁的方式不公平。排队买票，先来先买
-下面代码为我调用Lock方法时执行的一个顺序。其中有些方法不属于`NonfairSync`
-
-```java
-
-static final class FairSync extends Sync {
-       private static final long serialVersionUID = -3000897897090466540L;
-
-       final void lock() {
-           acquire(1);
-       }
-
-       /**
-        *
-        * 调用这个方法首先会尝试获取锁，如果获取不到会把当前线程加入等待列中
-        */
-       public final void acquire(int var1) {
-           //this.acquireQueued(this.addWaiter(AbstractQueuedSynchronizer.Node.EXCLUSIVE), var1)
-           //这个方法把当前线程加入等待序列。具体代码自己去看。
-            if (!this.tryAcquire(var1) && this.acquireQueued(this.addWaiter(AbstractQueuedSynchronizer.Node.EXCLUSIVE), var1)) {
-                selfInterrupt();
-            }
-
-       /**
-        * Fair version of tryAcquire.  Don't grant access unless
-        * recursive call or no waiters or is first.
-        */
-       protected final boolean tryAcquire(int acquires) {
-           final Thread current = Thread.currentThread();
-           int c = getState();
-           if (c == 0) {
-           //这里是跟非公平锁不一样的地方
-           //hasQueuedPredecessors判断线程是不是在队列中的第一个
-           //只有第一个才有资格去抢
-               if (!hasQueuedPredecessors() &&
-                   compareAndSetState(0, acquires)) {
-                   setExclusiveOwnerThread(current);
-                   return true;
-               }
-           }
-           else if (current == getExclusiveOwnerThread()) {
-               int nextc = c + acquires;
-               if (nextc < 0)
-                   throw new Error("Maximum lock count exceeded");
-               setState(nextc);
-               return true;
-           }
-           return false;
-       }
-   }
-```
-
-##### release方法同unLock
-
-字面意思释放锁，unpark掉当前线程。
-
-```java
-
-/**
- * Releases in exclusive mode.  Implemented by unblocking one or
- * more threads if {@link #tryRelease} returns true.
- * This method can be used to implement method {@link Lock#unlock}.
- *
- * @param arg the release argument.  This value is conveyed to
- *        {@link #tryRelease} but is otherwise uninterpreted and
- *        can represent anything you like.
- * @return the value returned from {@link #tryRelease}
- */
-public final boolean release(int arg) {
-    if (tryRelease(arg)) {
-        Node h = head;
-        if (h != null && h.waitStatus != 0)
-            unparkSuccessor(h);
-        return true;
+    /**
+     * 取得存储在静态变量中的ApplicationContext.
+     */
+    public static ApplicationContext getApplicationContext() {
+        assertContextInjected();
+        return applicationContext;
     }
-    return false;
+
+    /**
+     * 从静态变量applicationContext中取得Bean, 自动转型为所赋值对象的类型.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T getBean(String name) {
+        assertContextInjected();
+        return (T) applicationContext.getBean(name);
+    }
+
+    /**
+     * 从静态变量applicationContext中取得Bean, 自动转型为所赋值对象的类型.
+     */
+    public static <T> T getBean(Class<T> requiredType) {
+        assertContextInjected();
+        return applicationContext.getBean(requiredType);
+    }
+
+    /**
+     * 清除SpringContextHolder中的ApplicationContext为Null.
+     */
+    public static void clearHolder() {
+        applicationContext = null;
+    }
+
+    /**
+     * 实现ApplicationContextAware接口, 注入Context到静态变量中.
+     */
+    @Override
+    public void setApplicationContext(ApplicationContext appContext) {
+        applicationContext = appContext;
+    }
+
+    /**
+     * 实现DisposableBean接口, 在Context关闭时清理静态变量.
+     */
+    @Override
+    public void destroy() throws Exception {
+        SpringContextHolder.clearHolder();
+    }
+
+    /**
+     * 检查ApplicationContext不为空.
+     */
+    private static void assertContextInjected() {
+        Validate.validState(applicationContext != null, "applicaitonContext属性未注入, 请在applicationContext.xml中定义SpringContextHolder.");
+    }
 }
 
-
-/**
-   * Wakes up node's successor, if one exists.
-   *
-   * @param node the node
-   */
-  private void unparkSuccessor(Node node) {
-      /*
-       * If status is negative (i.e., possibly needing signal) try
-       * to clear in anticipation of signalling.  It is OK if this
-       * fails or if status is changed by waiting thread.
-       */
-      int ws = node.waitStatus;
-      if (ws < 0)
-          compareAndSetWaitStatus(node, ws, 0);
-
-      /*
-       * Thread to unpark is held in successor, which is normally
-       * just the next node.  But if cancelled or apparently null,
-       * traverse backwards from tail to find the actual
-       * non-cancelled successor.
-       */
-      Node s = node.next;
-      if (s == null || s.waitStatus > 0) {
-          s = null;
-          //从尾节点往前找，找到合适的然后干掉
-          for (Node t = tail; t != null && t != node; t = t.prev)
-              if (t.waitStatus <= 0)
-                  s = t;
-      }
-      if (s != null)
-          LockSupport.unpark(s.thread);
-  }
-
-
 ```
-
-## 使用案例
-
-#### 条件锁 Condition
-
-Condition是针对于对象的，`ReentrantLock`是针对于线程的。
-
-部分方法描述
-
-| void await()                       | 当前线程进入等待状态，直到被通知或中断。                      |
-| ---------------------------------- | ---------------------------------------- |
-| void awaitUninterruptibly()        | 当前线程进入等待状态，对中断不敏感                        |
-| long awaitNanos(long nanosTimeout) | 当前线程进入等待状态，直到被通知，中断或者超时，返回值表示剩余的时间，返回值如果是0或者负数，那么可以认定已经超时了 |
-| boolean awaitUntil(Date deadline)  | 当前线程进入等待状态，直到被通知、中断或者到某个时间，如果没有到指定时间，返回true，否则到了指定时间，返回false |
-| void signal()                      | 唤醒一个等待在condition中的线程，该线程从等待方法返回前必须获取与Condition相关联的锁 |
-| void signlAll()                    | 唤醒所有等待的condition中的线程，能够从等待方法返回的线程必须获得与condition相关联的锁 |
-
-```java
-public class ConditionUseCase {
-    private Lock lock = new ReentrantLock();
-    private Condition condition = lock.newCondition();
-
-    public static void main(String[] args){
-
-    }
-
-    public void conditionWait() throws InterruptedException {
-        lock.lock();
-        try {
-            condition.await();
-        }finally {
-            lock.unlock();
-        }
-    }
-    public void conditionSignal(){
-        lock.lock();
-        try {
-            condition.signal();
-        }finally {
-            lock.unlock();
-        }
-    }
-}
-```
-
-
-通过Cache来解释读写锁，HashMap是非线程安全的，通过读写锁实现Cache的线程安全
-
-```java
-public class Cache {
-    static Map<String,Object> map = new HashMap<String,Object>();
-    static ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
-    static Lock r = rwl.readLock();
-    static Lock w = rwl.writeLock();
-
-    public static final Object get(String key){
-        r.lock();
-        try {
-            return map.get(key);
-        }finally {
-            r.unlock();
-        }
-    }
-
-    public static final Object put(String key,Object value){
-        w.lock();
-        try {
-            return map.put(key,value);
-        }finally {
-            w.unlock();
-        }
-    }
-
-    public static final void clear() {
-        w.lock();
-        try {
-            map.clear();
-        }finally {
-            w.unlock();
-        }
-    }
-
-}
-```
-
-- 有界队列BoundedQueue解释Condition
-
-```java
-public class BoundedQueue<T> {
-    private Object[] items;
-    private int addIndex,removeIndex,count;
-    private Lock lock = new ReentrantLock();
-    private Condition notEmpty = lock.newCondition();
-    private Condition notFull = lock.newCondition();
-
-    public BoundedQueue(int size){
-        items = new Object[size];
-    }
-
-    public void add(T t) throws InterruptedException {
-        lock.lock();
-        try {
-            while(count == items.length)
-                notFull.await();
-            items[addIndex] = t;
-            if(++addIndex == items.length)
-                addIndex = 0;
-            ++count;
-            notEmpty.signal();
-        }finally {
-            lock.unlock();
-        }
-    }
-
-    public T remove() throws InterruptedException {
-        lock.lock();
-        try {
-            while(count == 0)
-                notEmpty.await();
-            Object x = items[removeIndex];
-            if(++removeIndex == items.length)
-                removeIndex = 0;
-            --count;
-            notFull.signal();
-            return (T) x;
-        }finally {
-            lock.unlock();
-        }
-
-    }
-}
-```
+想要了解其它两个的使用参考[spring官方文档容器扩展](https://docs.spring.io/spring/docs/5.2.2.RELEASE/spring-framework-reference/core.html#beans-factory-extension)
 
 ## 总结
 
-`ReentrantLock`的讲解就到此结束,看博客前希望自己看过一点源码。如果没看过的话那么请重点关注我提出来的那几个代码。如果对于这个`ReentrantLock`想要更深的理解。请关注
-[simviso](https://space.bilibili.com/2494318/dynamic)
+`SpringIOC`是学习`Spring`的核心。下面笔者会带着大家一起去学习`Spring Core`的源码。敬请期待。
