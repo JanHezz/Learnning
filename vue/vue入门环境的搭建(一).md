@@ -1,11 +1,5 @@
-﻿---
-  title: vue环境的搭建
-  date: {{ date }}   
-  categories: ['前端'] 
-  tags: ['vue','nodejs']       
-  comments: true    
-  img:             
----
+﻿《vue环境的搭建（一）》首发[橙寂博客](http://www.luckyhe.com/post/14.html)转发请加此提示
+
 ## <center>vue环境的搭建</center>
 #### 前言
 >vue是现在前端框架非常火的一个东西,所以我也想学习下看看这究竟是个什么东西。刚开始很闷进去vue官网看了下文档。对于刚入门者是不太友好的（需要一定的node.js的开发经验不然大家会跟我一样蒙）。后面经过自己的查阅总算是找到了门道。
