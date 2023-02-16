@@ -1,0 +1,225 @@
+《activiti实现退回到指定节点》首发[橙寂博客](http://www.luckyhe.com/post/79.html)转发请加此提示
+
+使用原生activiti5.2版本已有一年多了，因此在后台封装了一些比较常用的一些方法。，流程设计器，没有任何改动还是原生的毕竟`Angular`永远的神，改不动。不要跟我说换`flowable`都是一批开发者。只不过`flowable`支持的功能要多点，全点。
+
+首先咱先看一张流程图。
+
+![示例图1](E:\com.me\Learnning\pic\图片\工作流\退回到指定节点\示例图1.jpg)
+
+咱先不管合不合理，反正我的客户有这个需求，并且这个需求还是常态。如果你只使用actviti原生的功能去做，那么你的图就会跟我一样的效果。分支一多。直接就疯了。
+
+## 上代码（老版本）
+话不多说，直接上源码。一个成熟的代码都是经过测试而来，下面为我的老版本代码，这个版本的代码不支持退回到多实例节点。单实例节点时ok的。
+
+**JumpActivityCmd**
+
+```
+package com.easycloud.jxcmcc.act.cmd;
+
+import org.activiti.engine.impl.interceptor.Command;
+import org.activiti.engine.impl.interceptor.CommandContext;
+import org.activiti.engine.impl.persistence.entity.ExecutionEntity;
+import org.activiti.engine.impl.pvm.process.ActivityImpl;
+import org.activiti.engine.impl.pvm.process.ProcessDefinitionImpl;
+
+/**
+ * @CLASSNAME JumpActivityCmd
+ * @Description 
+ * @Auther JanHezz
+ * @BLOG www.luckyhe.com
+ * @DATE 2021/3/16 18:06
+ */
+
+public class JumpActivityCmd implements Command<Object> {
+    private String activityId;
+    private String processInstanceId;
+    private String jumpOrigin;
+
+    public JumpActivityCmd(String activityId, String processInstanceId, String jumpOrigin) {
+        this.activityId = activityId;
+        this.processInstanceId = processInstanceId;
+        this.jumpOrigin = jumpOrigin;
+    }
+
+    public JumpActivityCmd(String activityId, String processInstanceId) {
+        this(activityId, processInstanceId, "jump");
+    }
+
+    public Object execute(CommandContext commandContext) {
+        ExecutionEntity executionEntity = commandContext.getExecutionEntityManager().findExecutionById(processInstanceId);
+        executionEntity.destroyScope(jumpOrigin);
+        ProcessDefinitionImpl processDefinition = executionEntity.getProcessDefinition();
+        ActivityImpl activity = processDefinition.findActivity(activityId);
+        executionEntity.executeActivity(activity);
+        return executionEntity;
+    }
+}
+
+```
+
+**退回方法**
+
+```
+ @Override
+      @Transactional(rollbackFor = Exception.class)
+    public R back(TaskAuditVo auditVo) {
+
+        if (StrUtil.isBlank(auditVo.getTaskId()) ||
+                StrUtil.isBlank(auditVo.getProcessInstanceId())) {
+            return R.failed("不存在该流程实例，请确认!");
+        }
+
+        	Task task = taskService.createTaskQuery()
+			.taskId(auditVo.getTaskId())
+			.singleResult();
+
+        if (ObjectUtil.isNull(task))
+        {
+             return R.failed("不存在该流程实例，请确认!");
+
+        }
+        ProcessInstance pi = runtimeService.createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
+
+        ProcessDefinitionEntity definitionEntity = (ProcessDefinitionEntity) ((RepositoryServiceImpl) repositoryService).getProcessDefinition(task.getProcessDefinitionId());
+        String instanceId = task.getProcessInstanceId();
+        ActivityImpl activityImpl = definitionEntity.findActivity(FlowConstants.FLOW_SUBMIT_TASK_ID);
+        if (activityImpl == null) {
+            return R.failed("不存在起草人节点，请确认!");
+        }
+        Authentication.setAuthenticatedUserId(SecurityUtils.getUser().getUsername());
+
+          if(StrUtil.isEmpty(auditVo.getMessage()))
+        {
+            auditVo.setMessage("退回修改");
+        }
+       taskService.addComment(auditVo.getTaskId(), auditVo.getProcessInstanceId(), CommentTypeEnum.BACK.getName(), auditVo.getMessage());
+         FlowVo flowVo = new FlowVo();
+        flowVo.setFlowId(pi.getProcessInstanceId());
+        flowVo.setBusinessId(pi.getBusinessKey());
+        flowVo.setStatus(FlowTypeEnum.RETURN
+                .getCode());
+        flowVo.setVariables(taskService
+                .getVariables(task
+                        .getId()));
+        flowVo.setStep(FlowConstants.FLOW_SUBMIT_TASK_ID);
+        //跳转到起草节点。
+        //FlowConstants.FLOW_SUBMIT_TASK_ID这个节点就是退回节点。如果你想自定义节点，那么这个节点，从前台传过来
+        managementService.executeCommand(new JumpActivityCmd(FlowConstants.FLOW_SUBMIT_TASK_ID,
+                instanceId));
+
+//        taskService.complete(auditVo.getTaskId(), auditVo.getVariables());
+        return R.ok(null,"退回成功");
+
+    }
+```
+
+## 上代码（老版本）
+
+话不多说，直接上源码。一个成熟的代码都是经过测试而来，下面为我的老版本代码，这个版本的代码不支持退回到多实例节点。单实例节点时ok的。
+
+**JumpActivityCmd**
+
+```
+package com.easycloud.jxcmcc.act.cmd;
+
+import org.activiti.engine.impl.interceptor.Command;
+import org.activiti.engine.impl.interceptor.CommandContext;
+import org.activiti.engine.impl.persistence.entity.ExecutionEntity;
+import org.activiti.engine.impl.pvm.process.ActivityImpl;
+import org.activiti.engine.impl.pvm.process.ProcessDefinitionImpl;
+
+/**
+ * @CLASSNAME JumpActivityCmd
+ * @Description 
+ * @Auther JanHezz
+ * @BLOG www.luckyhe.com
+ * @DATE 2021/3/16 18:06
+ */
+
+public class JumpActivityCmd implements Command<Object> {
+    private String activityId;
+    private String processInstanceId;
+    private String jumpOrigin;
+
+    public JumpActivityCmd(String activityId, String processInstanceId, String jumpOrigin) {
+        this.activityId = activityId;
+        this.processInstanceId = processInstanceId;
+        this.jumpOrigin = jumpOrigin;
+    }
+
+    public JumpActivityCmd(String activityId, String processInstanceId) {
+        this(activityId, processInstanceId, "jump");
+    }
+
+    public Object execute(CommandContext commandContext) {
+        ExecutionEntity executionEntity = commandContext.getExecutionEntityManager().findExecutionById(processInstanceId);
+        executionEntity.destroyScope(jumpOrigin);
+        ProcessDefinitionImpl processDefinition = executionEntity.getProcessDefinition();
+        ActivityImpl activity = processDefinition.findActivity(activityId);
+        executionEntity.executeActivity(activity);
+        return executionEntity;
+    }
+}
+
+```
+
+**退回方法**
+
+```
+ @Override
+      @Transactional(rollbackFor = Exception.class)
+    public R back(TaskAuditVo auditVo) {
+
+        if (StrUtil.isBlank(auditVo.getTaskId()) ||
+                StrUtil.isBlank(auditVo.getProcessInstanceId())) {
+            return R.failed("不存在该流程实例，请确认!");
+        }
+
+        	Task task = taskService.createTaskQuery()
+			.taskId(auditVo.getTaskId())
+			.singleResult();
+
+        if (ObjectUtil.isNull(task))
+        {
+             return R.failed("不存在该流程实例，请确认!");
+
+        }
+        ProcessInstance pi = runtimeService.createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
+
+        ProcessDefinitionEntity definitionEntity = (ProcessDefinitionEntity) ((RepositoryServiceImpl) repositoryService).getProcessDefinition(task.getProcessDefinitionId());
+        String instanceId = task.getProcessInstanceId();
+        ActivityImpl activityImpl = definitionEntity.findActivity(FlowConstants.FLOW_SUBMIT_TASK_ID);
+        if (activityImpl == null) {
+            return R.failed("不存在起草人节点，请确认!");
+        }
+        Authentication.setAuthenticatedUserId(SecurityUtils.getUser().getUsername());
+
+          if(StrUtil.isEmpty(auditVo.getMessage()))
+        {
+            auditVo.setMessage("退回修改");
+        }
+       taskService.addComment(auditVo.getTaskId(), auditVo.getProcessInstanceId(), CommentTypeEnum.BACK.getName(), auditVo.getMessage());
+         FlowVo flowVo = new FlowVo();
+        flowVo.setFlowId(pi.getProcessInstanceId());
+        flowVo.setBusinessId(pi.getBusinessKey());
+        flowVo.setStatus(FlowTypeEnum.RETURN
+                .getCode());
+        flowVo.setVariables(taskService
+                .getVariables(task
+                        .getId()));
+        flowVo.setStep(FlowConstants.FLOW_SUBMIT_TASK_ID);
+        //跳转到起草节点。
+        //FlowConstants.FLOW_SUBMIT_TASK_ID这个节点就是退回节点。如果你想自定义节点，那么这个节点，从前台传过来
+        managementService.executeCommand(new JumpActivityCmd(FlowConstants.FLOW_SUBMIT_TASK_ID,
+                instanceId));
+
+//        taskService.complete(auditVo.getTaskId(), auditVo.getVariables());
+        return R.ok(null,"退回成功");
+
+    }
+```
+
+
+
+## 总结
+activiti的初探功能，相信看了这篇文章写一个请假流程的demo大家应该是没问题的。我接下来会一直更新这篇文章。跟大家一同探索工作流

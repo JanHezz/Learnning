@@ -92,7 +92,7 @@ https://github.com/login/oauth/access_token? +
     client_id=${clientID}& +
     client_secret=${clientSecret}&+
     code=${requestToken}
-  ```
+```
 
 4. 拿到token后把token存起来。然后去拿取想要的信息。这一步做完后,所有的业务就是你自己得事了。`token`给你了，你想要咋搞就咋搞。
 
@@ -115,10 +115,10 @@ https://github.com/login/oauth/access_token? +
 1. 带上已注册的`client_ID`客户端id以及`client_secret`密钥。去请求认证服务器。
 ···java
 https://www.luckyhe.com/oauth/authorize?
-  response_type=token&
-  client_id=CLIENT_ID&
-  redirect_uri=CALLBACK_URL&
-  scope=read
+    response_type=token&
+    client_id=CLIENT_ID&
+    redirect_uri=CALLBACK_URL&
+    scope=read
 ···
 2. 这是认证服务器会直接带上`token`来访问你提供的`redirect_uri`。
 
